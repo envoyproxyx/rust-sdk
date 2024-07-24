@@ -1,0 +1,21 @@
+[package]
+name = "envoyx-rust-sdk"
+version = "0.1.0"
+edition = "2021"
+authors = ["Takeshi Yoneda <t.y.mathetake@gmail.com>"]
+description = "EnvoyX Rust SDK"
+readme = "README.md"
+license = "Apache-2.0"
+repository = "https://github.com/envoyproxyx/rust-sdk"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.65.1"
+
+[lib]
+
+[[example]]
+crate-type = ["cdylib"]
+name = "example"
+path = "example/lib.rs"
