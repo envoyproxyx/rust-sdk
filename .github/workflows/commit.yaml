@@ -71,5 +71,5 @@ jobs:
         echo $ENVOY_BIN_DIR >> $GITHUB_PATH
 
     - name: Conformance tests
-      run: echo "TODO"
+      run: go run github.com/envoyproxyx/sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so --target=TestHelloWorld
   
