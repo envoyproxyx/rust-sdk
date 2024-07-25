@@ -14,12 +14,11 @@ mod abi {
 macro_rules! init {
     ($new_filter_fn:expr) => {
         #[no_mangle]
-        pub extern "C" fn __envoy_dynamic_module_v1_event_program_init() {
-            println!("Initializing the module");
+        pub extern "C" fn __envoy_dynamic_module_v1_event_program_init() -> usize {
             unsafe {
                 envoy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_FN = $new_filter_fn;
             }
-            println!("Module initialized");
+            0
         }
     };
 }
@@ -29,17 +28,17 @@ pub static mut NEW_HTTP_FILTER_FN: fn(&str) -> Box<dyn HttpFilter> = |_: &str| {
 };
 
 #[no_mangle]
-extern "C" fn __envoy_dynamic_module_v1_event_http_filter_init(
+unsafe extern "C" fn __envoy_dynamic_module_v1_event_http_filter_init(
     config_ptr: abi::__envoy_dynamic_module_v1_type_HttpFilterConfigPtr,
     config_size: abi::__envoy_dynamic_module_v1_type_HttpFilterConfigSize,
 ) -> abi::__envoy_dynamic_module_v1_type_HttpFilterPtr {
     // Convert the raw pointer to the str.
-    let config = unsafe {
+    let config = {
         let slice = std::slice::from_raw_parts(config_ptr as *const u8, config_size);
         std::str::from_utf8(slice).unwrap()
     };
 
-    let boxed_filter = Box::into_raw(unsafe { NEW_HTTP_FILTER_FN(config) });
+    let boxed_filter = Box::into_raw(NEW_HTTP_FILTER_FN(config));
     let boxed_filter_ptr = Box::into_raw(Box::new(boxed_filter));
     boxed_filter_ptr as abi::__envoy_dynamic_module_v1_type_HttpFilterPtr
 }
@@ -53,7 +52,7 @@ unsafe extern "C" fn __envoy_dynamic_module_v1_event_http_filter_destroy(
 
     // Drop the Box<dyn HttpFilter> and the Box<*mut dyn HttpFilter>
     let _outer = Box::from_raw(http_filter);
-    let _inner = Box::from_raw(&mut **http_filter);
+    let _inner = Box::from_raw(*http_filter);
 }
 
 #[no_mangle]
