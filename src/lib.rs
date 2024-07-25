@@ -7,66 +7,132 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 /// Define the init function for the module.
 /// This macro should be used in the root of the module.
 /// The code block passed to the macro will be executed exactly when the module is loaded.
-///
-/// ```
-/// use envoyx_rust_sdk::init;
-///
-/// init!({
-///   println!("Hello, World!");
-/// });
-/// ```
-///
 #[macro_export]
 macro_rules! init {
-    ($code:block, $http_filter_type:ty, $http_filter_instance_type:ty) => {
+    ($new_filter_fn:expr) => {
         #[no_mangle]
         pub extern "C" fn __envoy_dynamic_module_v1_event_program_init() {
-            $code;
+            unsafe {
+                NEW_HTTP_FILTER_FN = Some($new_filter_fn);
+            }
         }
     };
 }
 
-pub fn envoy_dynamic_module_v1_event_http_filter_init(
+static mut NEW_HTTP_FILTER_FN: Option<fn(&str) -> Box<dyn HttpFilter>> = None;
+
+#[no_mangle]
+pub extern "C" fn __envoy_dynamic_module_v1_event_http_filter_init(
     config_ptr: __envoy_dynamic_module_v1_type_HttpFilterConfigPtr,
     config_size: __envoy_dynamic_module_v1_type_HttpFilterConfigSize,
 ) -> __envoy_dynamic_module_v1_type_HttpFilterPtr {
-    return 0;
+    // Convert the raw pointer to the str.
+    let config = unsafe {
+        let slice = std::slice::from_raw_parts(config_ptr as *const u8, config_size as usize);
+        std::str::from_utf8(slice).unwrap()
+    };
+
+    let boxed_filter = unsafe { NEW_HTTP_FILTER_FN.unwrap()(config) };
+    let boxed_filter_ptr = Box::into_raw(boxed_filter);
+    boxed_filter_ptr as *mut u8 as __envoy_dynamic_module_v1_type_HttpFilterPtr
 }
 
-/// This function is called when the module is loaded.
-///
-/// Made public for the usage in the generated initialization function, not for the module code.
-pub fn envoy_dynamic_module_v1_event_http_filter_destroy<
-    FI: HttpFilterInstance,
-    F: HttpFilter<FI>,
->(
-    http_filter: &F,
+#[no_mangle]
+pub extern "C" fn __envoy_dynamic_module_v1_event_http_filter_destroy(
+    http_filter: __envoy_dynamic_module_v1_type_HttpFilterPtr,
 ) {
+    let http_filter = unsafe { Box::from_raw(http_filter as *mut dyn HttpFilter) };
     http_filter.destroy();
 }
 
-/// This function is called when the module is loaded.
-///
-/// Made public for the usage in the generated initialization function, not for the module code.
-pub fn envoy_dynamic_module_v1_event_http_filter_instance_init<
-    FI: HttpFilterInstance,
-    F: HttpFilter<FI>,
->(
+#[no_mangle]
+pub extern "C" fn __envoy_dynamic_module_v1_event_http_filter_instance_init(
     envoy_filter_instance_ptr: __envoy_dynamic_module_v1_type_EnvoyFilterInstancePtr,
-    http_filter: &mut F,
-) -> Box<FI> {
-    http_filter.new_http_filter_instance(EnvoyFilterInstance {
+    http_filter: __envoy_dynamic_module_v1_type_HttpFilterPtr,
+) -> __envoy_dynamic_module_v1_type_HttpFilterInstancePtr {
+    let http_filter = unsafe { Box::from_raw(http_filter as *mut dyn HttpFilter) };
+
+    let http_filter_instance = http_filter.new_http_filter_instance(EnvoyFilterInstance {
         raw_addr: envoy_filter_instance_ptr,
-    })
+    });
+
+    Box::into_raw(http_filter_instance) as __envoy_dynamic_module_v1_type_HttpFilterInstancePtr
+}
+
+#[no_mangle]
+pub extern "C" fn __envoy_dynamic_module_v1_event_http_filter_instance_request_headers(
+    http_filter_instance: __envoy_dynamic_module_v1_type_HttpFilterInstancePtr,
+    request_headers_ptr: __envoy_dynamic_module_v1_type_HttpRequestHeadersMapPtr,
+    end_of_stream: __envoy_dynamic_module_v1_type_EndOfStream,
+) -> __envoy_dynamic_module_v1_type_EventHttpRequestHeadersStatus {
+    let http_filter_instance =
+        unsafe { &mut *(http_filter_instance as *mut dyn HttpFilterInstance) };
+    crate::envoy_dynamic_module_v1_event_http_filter_instance_request_headers(
+        http_filter_instance,
+        request_headers_ptr,
+        end_of_stream,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn __envoy_dynamic_module_v1_event_http_filter_instance_request_body(
+    http_filter_instance: __envoy_dynamic_module_v1_type_HttpFilterInstancePtr,
+    buffer: __envoy_dynamic_module_v1_type_HttpRequestBodyBufferPtr,
+    end_of_stream: __envoy_dynamic_module_v1_type_EndOfStream,
+) -> __envoy_dynamic_module_v1_type_EventHttpRequestBodyStatus {
+    let http_filter_instance =
+        unsafe { &mut *(http_filter_instance as *mut dyn HttpFilterInstance) };
+    crate::envoy_dynamic_module_v1_event_http_filter_instance_request_body(
+        http_filter_instance,
+        buffer,
+        end_of_stream,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn __envoy_dynamic_module_v1_event_http_filter_instance_response_headers(
+    http_filter_instance: __envoy_dynamic_module_v1_type_HttpFilterInstancePtr,
+    response_headers_map_ptr: __envoy_dynamic_module_v1_type_HttpResponseHeaderMapPtr,
+    end_of_stream: __envoy_dynamic_module_v1_type_EndOfStream,
+) -> __envoy_dynamic_module_v1_type_EventHttpResponseHeadersStatus {
+    let http_filter_instance =
+        unsafe { &mut *(http_filter_instance as *mut dyn HttpFilterInstance) };
+    crate::envoy_dynamic_module_v1_event_http_filter_instance_response_headers(
+        http_filter_instance,
+        response_headers_map_ptr,
+        end_of_stream,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn __envoy_dynamic_module_v1_event_http_filter_instance_response_body(
+    http_filter_instance: __envoy_dynamic_module_v1_type_HttpFilterInstancePtr,
+    buffer: __envoy_dynamic_module_v1_type_HttpResponseBodyBufferPtr,
+    end_of_stream: __envoy_dynamic_module_v1_type_EndOfStream,
+) -> __envoy_dynamic_module_v1_type_EventHttpResponseBodyStatus {
+    let http_filter_instance =
+        unsafe { &mut *(http_filter_instance as *mut dyn HttpFilterInstance) };
+    crate::envoy_dynamic_module_v1_event_http_filter_instance_response_body(
+        http_filter_instance,
+        buffer,
+        end_of_stream,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn __envoy_dynamic_module_v1_event_http_filter_instance_destroy(
+    http_filter_instance: __envoy_dynamic_module_v1_type_HttpFilterInstancePtr,
+) {
+    let http_filter_instance =
+        unsafe { Box::from_raw(http_filter_instance as *mut dyn HttpFilterInstance) };
+    crate::envoy_dynamic_module_v1_event_http_filter_instance_destroy(&mut *http_filter_instance);
 }
 
 /// This function is called when request headers are received.
 ///
 /// Made public for the usage in the generated initialization function, not for the module code.
-pub fn envoy_dynamic_module_v1_event_http_filter_instance_request_headers<
-    FI: HttpFilterInstance,
->(
-    http_filter_instance: &mut FI,
+pub fn envoy_dynamic_module_v1_event_http_filter_instance_request_headers(
+    http_filter_instance: &mut dyn HttpFilterInstance,
     request_headers_ptr: __envoy_dynamic_module_v1_type_HttpRequestHeadersMapPtr,
     end_of_stream: __envoy_dynamic_module_v1_type_EndOfStream,
 ) -> __envoy_dynamic_module_v1_type_EventHttpRequestHeadersStatus {
@@ -83,8 +149,8 @@ pub fn envoy_dynamic_module_v1_event_http_filter_instance_request_headers<
 /// This function is called when request body data is received.
 ///
 /// Made public for the usage in the generated initialization function, not for the module code.
-pub fn envoy_dynamic_module_v1_event_http_filter_instance_request_body<FI: HttpFilterInstance>(
-    http_filter_instance: &mut FI,
+pub fn envoy_dynamic_module_v1_event_http_filter_instance_request_body(
+    http_filter_instance: &mut dyn HttpFilterInstance,
     buffer: __envoy_dynamic_module_v1_type_HttpRequestBodyBufferPtr,
     end_of_stream: __envoy_dynamic_module_v1_type_EndOfStream,
 ) -> __envoy_dynamic_module_v1_type_EventHttpRequestBodyStatus {
@@ -96,10 +162,8 @@ pub fn envoy_dynamic_module_v1_event_http_filter_instance_request_body<FI: HttpF
 /// This function is called when response headers are received.
 ///
 /// Made public for the usage in the generated initialization function, not for the module code.
-pub fn envoy_dynamic_module_v1_event_http_filter_instance_response_headers<
-    FI: HttpFilterInstance,
->(
-    http_filter_instance: &mut FI,
+pub fn envoy_dynamic_module_v1_event_http_filter_instance_response_headers(
+    http_filter_instance: &mut dyn HttpFilterInstance,
     response_headers_map_ptr: __envoy_dynamic_module_v1_type_HttpResponseHeaderMapPtr,
     end_of_stream: __envoy_dynamic_module_v1_type_EndOfStream,
 ) -> __envoy_dynamic_module_v1_type_EventHttpResponseHeadersStatus {
@@ -116,8 +180,8 @@ pub fn envoy_dynamic_module_v1_event_http_filter_instance_response_headers<
 /// This function is called when response body data is received.
 ///
 /// Made public for the usage in the generated initialization function, not for the module code.
-pub fn envoy_dynamic_module_v1_event_http_filter_instance_response_body<FI: HttpFilterInstance>(
-    http_filter_instance: &mut FI,
+pub fn envoy_dynamic_module_v1_event_http_filter_instance_response_body(
+    http_filter_instance: &mut dyn HttpFilterInstance,
     buffer: __envoy_dynamic_module_v1_type_HttpResponseBodyBufferPtr,
     end_of_stream: __envoy_dynamic_module_v1_type_EndOfStream,
 ) -> __envoy_dynamic_module_v1_type_EventHttpResponseBodyStatus {
@@ -129,8 +193,8 @@ pub fn envoy_dynamic_module_v1_event_http_filter_instance_response_body<FI: Http
 /// This function is called when the filter instance is destroyed.
 ///
 /// Made public for the usage in the generated initialization function, not for the module code.
-pub fn envoy_dynamic_module_v1_event_http_filter_instance_destroy<FI: HttpFilterInstance>(
-    http_filter_instance: &mut FI,
+pub fn envoy_dynamic_module_v1_event_http_filter_instance_destroy(
+    http_filter_instance: &mut dyn HttpFilterInstance,
 ) {
     http_filter_instance.event_http_destroy(&EnvoyFilterInstance { raw_addr: 0 });
 }
@@ -139,7 +203,7 @@ pub fn envoy_dynamic_module_v1_event_http_filter_instance_destroy<FI: HttpFilter
 /// It is used to create HttpFilterInstance(s) that correspond to each HTTP request.
 ///
 /// This is only created once per module instance via the new_http_filter function.
-pub trait HttpFilter<H: HttpFilterInstance> {
+pub trait HttpFilter {
     /// This is called for each new HTTP request. This should return a new HttpFilterInstance object to handle the request.
     ///
     /// Note that this must be concurrency-safe as it can be called concurrently for multiple requests.
@@ -147,9 +211,14 @@ pub trait HttpFilter<H: HttpFilterInstance> {
     /// * `envoy_filter_instance` is the Envoy filter object that is used to interact with the underlying Envoy filter.
     ///   This object is unique for each HTTP request. The object is destroyed when the stream is destroyed.
     ///   Therefore, after event_http_destroy is called, the methods on this object become no-op.
-    fn new_http_filter_instance(&mut self, envoy_filter_instance: EnvoyFilterInstance) -> Box<H>;
+    fn new_http_filter_instance(
+        &mut self,
+        envoy_filter_instance: EnvoyFilterInstance,
+    ) -> Box<dyn HttpFilterInstance>;
 
     /// destroy is called when this filter is destroyed. E.g. the filter chain configuration is updated and removed from the Envoy.
+    ///
+    /// After this returns, the filter object is destructed.
     fn destroy(&self);
 }
 
