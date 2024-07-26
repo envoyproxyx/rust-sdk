@@ -275,14 +275,28 @@ pub struct EnvoyFilterInstance {
 }
 
 impl EnvoyFilterInstance {
-    /// continue_request is used to resume the request processing after the filter has stopped it.
+    /// Used to resume the request processing after the filter has stopped it.
     pub fn continue_request(&self) {
         unsafe { abi::__envoy_dynamic_module_v1_http_continue_request(self.raw_addr) }
     }
 
-    /// continue_response is used to resume the response processing after the filter has stopped it.
+    /// Used to resume the response processing after the filter has stopped it.
     pub fn continue_response(&self) {
         unsafe { abi::__envoy_dynamic_module_v1_http_continue_response(self.raw_addr) }
+    }
+
+    /// Returns the entire request body buffer.
+    pub fn get_request_body_buffer(&self) -> RequestBodyBuffer {
+        let buffer =
+            unsafe { abi::__envoy_dynamic_module_v1_http_get_request_body_buffer(self.raw_addr) };
+        RequestBodyBuffer { raw: buffer }
+    }
+
+    /// Returns the entire request body buffer.
+    pub fn get_response_body_buffer(&self) -> ResponseBodyBuffer {
+        let buffer =
+            unsafe { abi::__envoy_dynamic_module_v1_http_get_response_body_buffer(self.raw_addr) };
+        ResponseBodyBuffer { raw: buffer }
     }
 }
 
@@ -291,6 +305,8 @@ impl EnvoyFilterInstance {
 ///
 /// This is a shallow wrapper around the raw pointer to the Envoy request headers map.
 /// However, the object MUST NOT be used after the [`HttpFilterInstance::request_headers`].
+///
+#[derive(Debug, Clone, Copy)]
 pub struct RequestHeaders {
     raw: abi::__envoy_dynamic_module_v1_type_HttpRequestHeadersMapPtr,
 }
@@ -410,13 +426,70 @@ impl RequestHeaders {
 }
 
 /// An opaque object that represents the underlying Envoy Http request body buffer.
-/// This is used to interact with it from the module code.
+/// This is used to interact with it from the module code. The buffer consists of multiple slices.
+/// Each slice is a contiguous memory region.
+///
+/// This corresponds to either a frame of the request body or the whole body.
+///
+/// This is a shallow wrapper around the raw pointer to the Envoy request body buffer.
+///
+/// TODO: implement the `std::io::Read` trait for this object.
+#[derive(Debug, Clone, Copy)]
 pub struct RequestBodyBuffer {
     raw: abi::__envoy_dynamic_module_v1_type_HttpRequestBodyBufferPtr,
 }
 
+impl RequestBodyBuffer {
+    /// Returns the number of bytes in the buffer.
+    pub fn length(&self) -> usize {
+        unsafe { abi::__envoy_dynamic_module_v1_http_get_request_body_buffer_length(self.raw) }
+    }
+
+    /// Returns the number of slices in the buffer.
+    pub fn slices_count(&self) -> usize {
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_get_request_body_buffer_slices_count(self.raw)
+        }
+    }
+
+    /// Returns the slices of the buffer.
+    /// The slices are the contiguous memory regions that represent the buffer.
+    pub fn slices(&self) -> Vec<&mut [u8]> {
+        let mut slices = Vec::new();
+        let slices_count = self.slices_count();
+        for i in 0..slices_count {
+            let mut slice_ptr: *mut u8 = ptr::null_mut();
+            let mut slice_size: usize = 0;
+            unsafe {
+                abi::__envoy_dynamic_module_v1_http_get_request_body_buffer_slice(
+                    self.raw,
+                    i,
+                    &mut slice_ptr as *mut _ as usize,
+                    &mut slice_size as *mut _ as usize,
+                );
+            }
+            slices.push(unsafe { std::slice::from_raw_parts_mut(slice_ptr, slice_size) });
+        }
+        slices
+    }
+
+    /// Copies the entire buffer into a single contiguous Vec<u8> managed in Rust.
+    pub fn copy(&self) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        let slices = self.slices();
+        for slice in slices {
+            buffer.extend_from_slice(slice);
+        }
+        buffer
+    }
+}
+
 /// An opaque object that represents the underlying Envoy Http response headers map.
 /// This is used to interact with it from the module code.
+///
+/// This is a shallow wrapper around the raw pointer to the Envoy response headers map.
+///
+#[derive(Debug, Clone, Copy)]
 pub struct ResponseHeaders {
     raw: abi::__envoy_dynamic_module_v1_type_HttpResponseHeaderMapPtr,
 }
@@ -534,9 +607,61 @@ impl ResponseHeaders {
 }
 
 /// An opaque object that represents the underlying Envoy Http response body buffer.
-/// This is used to interact with it from the module code.
+/// This is used to interact with it from the module code. The buffer consists of one or more slices.
+/// The slices are the contiguous memory regions that represent the buffer.
+///
+/// This corresponds to either a frame of the response body or the whole body.
+///
+/// This is a shallow wrapper around the raw pointer to the Envoy response body buffer.
+///
+/// TODO: implement the `std::io::Read` trait for this object.
+#[derive(Debug, Clone, Copy)]
 pub struct ResponseBodyBuffer {
     raw: abi::__envoy_dynamic_module_v1_type_HttpResponseBodyBufferPtr,
+}
+
+impl ResponseBodyBuffer {
+    /// Returns the number of bytes in the buffer.
+    pub fn length(&self) -> usize {
+        unsafe { abi::__envoy_dynamic_module_v1_http_get_response_body_buffer_length(self.raw) }
+    }
+
+    /// Returns the number of slices in the buffer.
+    pub fn slices_count(&self) -> usize {
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_get_response_body_buffer_slices_count(self.raw)
+        }
+    }
+
+    /// Returns the slices of the buffer.
+    pub fn slices(&self) -> Vec<&mut [u8]> {
+        let mut slices = Vec::new();
+        let slices_count = self.slices_count();
+        for i in 0..slices_count {
+            let mut slice_ptr: *mut u8 = ptr::null_mut();
+            let mut slice_size: usize = 0;
+            unsafe {
+                abi::__envoy_dynamic_module_v1_http_get_response_body_buffer_slice(
+                    self.raw,
+                    i,
+                    &mut slice_ptr as *mut _ as usize,
+                    &mut slice_size as *mut _ as usize,
+                );
+            }
+            slices.push(unsafe { std::slice::from_raw_parts_mut(slice_ptr, slice_size) });
+        }
+        slices
+    }
+
+    /// Copies the entire buffer into a single contiguous Vec<u8> managed in Rust.
+    pub fn copy(&self) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        let slices = self.slices();
+        for slice in slices {
+            buffer.extend_from_slice(slice);
+        }
+        buffer
+    }
 }
 
 /// The status of the processing after the [`HttpFilterInstance::request_headers`] is called.

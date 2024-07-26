@@ -13,7 +13,7 @@ fn new_http_filter(config: &str) -> Box<dyn HttpFilter> {
         "helloworld" => Box::new(HelloWorldFilter {}),
         "delay" => Box::new(DelayFilter::default()),
         "headers" => Box::new(HeadersFilter {}),
-        "bodies" => Box::new(HelloWorldFilter {}), // TODO:
+        "bodies" => Box::new(BodiesFilter {}),
         "bodies_replace" => Box::new(HelloWorldFilter {}), // TODO:
         _ => panic!("Unknown config: {}", config),
     }
@@ -321,5 +321,91 @@ impl HttpFilterInstance for DelayFilterInstance {
 
     fn destroy(&mut self) {
         *self.envoy_filter_instance.lock().unwrap() = None;
+    }
+}
+
+/// BodyFilter is a filter that manipulates request/response bodies.
+///
+/// This implements the [`HttpFilter`] trait, and will be created per each filter chain.
+struct BodiesFilter {}
+
+impl HttpFilter for BodiesFilter {
+    fn new_instance(
+        &mut self,
+        envoy_filter_instance: EnvoyFilterInstance,
+    ) -> Box<dyn HttpFilterInstance> {
+        Box::new(BodiesFilterInstance {
+            envoy_filter_instance,
+        })
+    }
+}
+
+/// BodiesFilterInstance is a filter instance that manipulates request/response bodies.
+///
+/// This implements the [`HttpFilterInstance`] trait, and will be created per each request.
+struct BodiesFilterInstance {
+    envoy_filter_instance: EnvoyFilterInstance,
+}
+
+impl HttpFilterInstance for BodiesFilterInstance {
+    fn request_body(
+        &mut self,
+        request_body: &RequestBodyBuffer,
+        end_of_stream: bool,
+    ) -> RequestBodyStatus {
+        println!(
+            "new request body frame: {}",
+            String::from_utf8(request_body.copy()).unwrap()
+        );
+        if !end_of_stream {
+            // Wait for the end of the stream to see the full body.
+            return RequestBodyStatus::StopIterationAndBuffer;
+        }
+
+        // Get the entire request body reference - this does not copy the body.
+        let entire_body = self.envoy_filter_instance.get_request_body_buffer();
+        println!(
+            "entire request body: {}",
+            String::from_utf8(entire_body.copy()).unwrap()
+        );
+
+        // Replace the entire body with 'Y' without copying.
+        for i in entire_body.slices() {
+            for j in i {
+                *j = b'X';
+            }
+        }
+        RequestBodyStatus::Continue
+    }
+
+    fn response_body(
+        &mut self,
+        response_body: &ResponseBodyBuffer,
+        end_of_stream: bool,
+    ) -> ResponseBodyStatus {
+        println!(
+            "new response body frame: {}",
+            String::from_utf8(response_body.copy()).unwrap()
+        );
+        if !end_of_stream {
+            // Wait for the end of the stream to see the full body.
+            return ResponseBodyStatus::StopIterationAndBuffer;
+        }
+
+        // Get the entire response body reference - this does not copy the body.
+        let entire_body = self.envoy_filter_instance.get_response_body_buffer();
+        println!(
+            "entire response body: {}",
+            String::from_utf8(entire_body.copy()).unwrap()
+        );
+
+        // Replace the entire body with 'Y' without copying.
+        for i in entire_body.slices() {
+            for j in i {
+                *j = b'Y';
+            }
+        }
+
+        ResponseBodyStatus::Continue
     }
 }
