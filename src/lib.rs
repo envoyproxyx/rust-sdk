@@ -296,7 +296,7 @@ pub struct RequestHeaders {
 }
 
 impl RequestHeaders {
-    /// Returns the first header value for the given key. To handle multiple values, use the [`RequestHeaders::Values`] method.
+    /// Returns the first header value for the given key. To handle multiple values, use the [`RequestHeaders::values`] method.
     pub fn get(&self, key: &str) -> Option<&str> {
         let key_ptr = key.as_ptr();
         let key_size = key.len();
@@ -422,7 +422,7 @@ pub struct ResponseHeaders {
 }
 
 impl ResponseHeaders {
-    /// Returns the first header value for the given key. To handle multiple values, use the [`ResponseHeaders::Values`] method.
+    /// Returns the first header value for the given key. To handle multiple values, use the [`ResponseHeaders::values`] method.
     pub fn get(&self, key: &str) -> Option<&str> {
         let key_ptr = key.as_ptr();
         let key_size = key.len();
