@@ -15,7 +15,7 @@ fn new_http_filter(config: &str) -> Box<dyn HttpFilter> {
     match config {
         "helloworld" => Box::new(HelloWorldFilter {}),
         "delay" => Box::new(DelayFilter {
-            atomic: std::sync::atomic::AtomicUsize::new(0),
+            atomic: std::sync::atomic::AtomicUsize::new(1),
         }),
         "headers" => Box::new(HeadersFilter {}),
         "bodies" => Box::new(BodiesFilter {}),
