@@ -18,4 +18,4 @@ bindgen = "0.65.1"
 [[example]]
 crate-type = ["cdylib"]
 name = "example"
-path = "example/lib.rs"
+path = "example/example.rs"

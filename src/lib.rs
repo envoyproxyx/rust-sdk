@@ -506,6 +506,53 @@ impl RequestBodyBuffer {
     pub fn reader(&self) -> RequestBodyBufferReader {
         RequestBodyBufferReader::from(*self)
     }
+
+    /// Appends the given data to the buffer.
+    ///
+    /// After this operation, previous slices might be invalidated.
+    pub fn append(&self, data: &[u8]) {
+        let data_ptr = data.as_ptr();
+        let data_size = data.len();
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_append_request_body_buffer(
+                self.raw,
+                data_ptr as *const _ as usize,
+                data_size,
+            )
+        }
+    }
+
+    /// Prepends the given data to the buffer.
+    ///
+    /// After this operation, previous slices might be invalidated.
+    pub fn prepend(&self, data: &[u8]) {
+        let data_ptr = data.as_ptr();
+        let data_size = data.len();
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_prepend_request_body_buffer(
+                self.raw,
+                data_ptr as *const _ as usize,
+                data_size,
+            )
+        }
+    }
+
+    /// Drains the buffer by the given size.
+    ///
+    /// After this operation, previous slices might be invalidated.
+    pub fn drain(&self, size: usize) {
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_drain_request_body_buffer(self.raw, size);
+        }
+    }
+
+    /// Replaces the entire buffer with the given data.
+    ///
+    /// After this operation, previous slices might be invalidated.
+    pub fn replace(&self, data: &[u8]) {
+        self.drain(self.length());
+        self.append(data);
+    }
 }
 
 pub struct RequestBodyBufferReader {
@@ -754,6 +801,53 @@ impl ResponseBodyBuffer {
     /// Returns a reader that implements the [`std::io::Read`] trait.
     pub fn reader(&self) -> ResponseBodyBufferReader {
         ResponseBodyBufferReader::from(*self)
+    }
+
+    /// Appends the given data to the buffer.
+    ///
+    /// After this operation, previous slices might be invalidated.
+    pub fn append(&self, data: &[u8]) {
+        let data_ptr = data.as_ptr();
+        let data_size = data.len();
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_append_response_body_buffer(
+                self.raw,
+                data_ptr as *const _ as usize,
+                data_size,
+            )
+        }
+    }
+
+    /// Prepends the given data to the buffer.
+    ///
+    /// After this operation, previous slices might be invalidated.
+    pub fn prepend(&self, data: &[u8]) {
+        let data_ptr = data.as_ptr();
+        let data_size = data.len();
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_prepend_response_body_buffer(
+                self.raw,
+                data_ptr as *const _ as usize,
+                data_size,
+            )
+        }
+    }
+
+    /// Drains the buffer by the given size.
+    ///
+    /// After this operation, previous slices might be invalidated.
+    pub fn drain(&self, size: usize) {
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_drain_response_body_buffer(self.raw, size);
+        }
+    }
+
+    /// Replaces the entire buffer with the given data.
+    ///
+    /// After this operation, previous slices might be invalidated.
+    pub fn replace(&self, data: &[u8]) {
+        self.drain(self.length());
+        self.append(data);
     }
 }
 

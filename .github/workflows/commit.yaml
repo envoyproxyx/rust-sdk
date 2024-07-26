@@ -72,8 +72,5 @@ jobs:
 
     - name: Conformance tests
       run: | 
-        go run github.com/mathetake/envoy-dynamic-modules-sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so --target=TestHelloWorld
-        go run github.com/mathetake/envoy-dynamic-modules-sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so --target=TestHeaders
-        go run github.com/mathetake/envoy-dynamic-modules-sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so --target=TestDelay
-        go run github.com/mathetake/envoy-dynamic-modules-sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so --target=TestBodies
+        go run github.com/mathetake/envoy-dynamic-modules-sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so
   

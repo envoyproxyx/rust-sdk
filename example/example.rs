@@ -17,7 +17,7 @@ fn new_http_filter(config: &str) -> Box<dyn HttpFilter> {
         "delay" => Box::new(DelayFilter::default()),
         "headers" => Box::new(HeadersFilter {}),
         "bodies" => Box::new(BodiesFilter {}),
-        "bodies_replace" => Box::new(HelloWorldFilter {}), // TODO:
+        "bodies_replace" => Box::new(BodiesReplace {}),
         _ => panic!("Unknown config: {}", config),
     }
 }
@@ -443,6 +443,125 @@ impl HttpFilterInstance for BodiesFilterInstance {
             }
         }
 
+        ResponseBodyStatus::Continue
+    }
+}
+
+/// BodiesReplaceFilter is a filter that replaces request/response bodies.
+///
+/// This implements the [`HttpFilter`] trait, and will be created per each filter chain.
+struct BodiesReplace {}
+
+impl HttpFilter for BodiesReplace {
+    fn new_instance(
+        &mut self,
+        envoy_filter_instance: EnvoyFilterInstance,
+    ) -> Box<dyn HttpFilterInstance> {
+        Box::new(BodiesReplaceInstance {
+            envoy_filter_instance,
+            request_append: String::new(),
+            request_prepend: String::new(),
+            request_replace: String::new(),
+            response_append: String::new(),
+            response_prepend: String::new(),
+            response_replace: String::new(),
+        })
+    }
+}
+
+/// BodiesReplaceInstance is a filter instance that replaces request/response bodies.
+///
+/// This implements the [`HttpFilterInstance`] trait, and will be created per each request.
+struct BodiesReplaceInstance {
+    envoy_filter_instance: EnvoyFilterInstance,
+    request_append: String,
+    request_prepend: String,
+    request_replace: String,
+    response_append: String,
+    response_prepend: String,
+    response_replace: String,
+}
+
+impl HttpFilterInstance for BodiesReplaceInstance {
+    fn request_headers(
+        &mut self,
+        request_headers: &RequestHeaders,
+        _end_of_stream: bool,
+    ) -> RequestHeadersStatus {
+        if let Some(value) = request_headers.get("append") {
+            self.request_append = value.to_string();
+        }
+        if let Some(value) = request_headers.get("prepend") {
+            self.request_prepend = value.to_string();
+        }
+        if let Some(value) = request_headers.get("replace") {
+            self.request_replace = value.to_string();
+        }
+        request_headers.remove("content-length"); // Remove content-length header to avoid mismatch.
+        RequestHeadersStatus::Continue
+    }
+
+    fn request_body(
+        &mut self,
+        _request_body: &RequestBodyBuffer,
+        end_of_stream: bool,
+    ) -> RequestBodyStatus {
+        if !end_of_stream {
+            // Wait for the end of the stream to see the full body.
+            return RequestBodyStatus::StopIterationAndBuffer;
+        }
+
+        let entire_body = self.envoy_filter_instance.get_request_body_buffer();
+        if !self.request_append.is_empty() {
+            entire_body.append(self.request_append.as_bytes());
+        }
+        if !self.request_prepend.is_empty() {
+            entire_body.prepend(self.request_prepend.as_bytes());
+        }
+        if !self.request_replace.is_empty() {
+            entire_body.replace(self.request_replace.as_bytes());
+        }
+        RequestBodyStatus::Continue
+    }
+
+    fn response_headers(
+        &mut self,
+        response_headers: &ResponseHeaders,
+        _end_of_stream: bool,
+    ) -> ResponseHeadersStatus {
+        if let Some(value) = response_headers.get("append") {
+            self.response_append = value.to_string();
+        }
+        if let Some(value) = response_headers.get("prepend") {
+            self.response_prepend = value.to_string();
+        }
+        if let Some(value) = response_headers.get("replace") {
+            self.response_replace = value.to_string();
+        }
+        response_headers.remove("content-length"); // Remove content-length header to avoid mismatch.
+        ResponseHeadersStatus::Continue
+    }
+
+    fn response_body(
+        &mut self,
+        _response_body: &ResponseBodyBuffer,
+        end_of_stream: bool,
+    ) -> ResponseBodyStatus {
+        if !end_of_stream {
+            // Wait for the end of the stream to see the full body.
+            return ResponseBodyStatus::StopIterationAndBuffer;
+        }
+
+        let entire_body = self.envoy_filter_instance.get_response_body_buffer();
+        if !self.response_append.is_empty() {
+            entire_body.append(self.response_append.as_bytes());
+        }
+        if !self.response_prepend.is_empty() {
+            entire_body.prepend(self.response_prepend.as_bytes());
+        }
+        if !self.response_replace.is_empty() {
+            entire_body.replace(self.response_replace.as_bytes());
+        }
         ResponseBodyStatus::Continue
     }
 }
