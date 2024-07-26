@@ -20,6 +20,7 @@ fn new_http_filter(config: &str) -> Box<dyn HttpFilter> {
         "headers" => Box::new(HeadersFilter {}),
         "bodies" => Box::new(BodiesFilter {}),
         "bodies_replace" => Box::new(BodiesReplace {}),
+        "send_response" => Box::new(SendResponseFilter {}),
         _ => panic!("Unknown config: {}", config),
     }
 }
@@ -557,5 +558,72 @@ impl HttpFilterInstance for BodiesReplaceInstance {
             entire_body.replace(self.response_replace.as_bytes());
         }
         ResponseBodyStatus::Continue
+    }
+}
+
+/// SendResponseFilter is a filter that sends a response.
+///
+/// This implements the [`HttpFilter`] trait, and will be created per each filter chain.
+struct SendResponseFilter {}
+
+impl HttpFilter for SendResponseFilter {
+    fn new_instance(
+        &mut self,
+        envoy_filter_instance: EnvoyFilterInstance,
+    ) -> Box<dyn HttpFilterInstance> {
+        Box::new(SendResponseFilterInstance {
+            envoy_filter_instance,
+            on_response_headers: false,
+        })
+    }
+}
+
+/// SendResponseFilterInstance is a filter instance that sends a response.
+///
+/// This implements the [`HttpFilterInstance`] trait, and will be created per each request.
+struct SendResponseFilterInstance {
+    envoy_filter_instance: EnvoyFilterInstance,
+    on_response_headers: bool,
+}
+
+impl HttpFilterInstance for SendResponseFilterInstance {
+    fn request_headers(
+        &mut self,
+        request_headers: &RequestHeaders,
+        _end_of_stream: bool,
+    ) -> RequestHeadersStatus {
+        if let Some(value) = request_headers.get(":path") {
+            if value == "/on_request" {
+                let headers: Vec<(&[u8], &[u8])> = vec![
+                    ("foo".as_bytes(), "bar".as_bytes()),
+                    ("bar".as_bytes(), "baz".as_bytes()),
+                ];
+                self.envoy_filter_instance.send_response(
+                    401,
+                    headers.as_slice(),
+                    "local response at request headers".as_bytes(),
+                );
+            }
+            if value == "/on_response" {
+                self.on_response_headers = true;
+            }
+        }
+        RequestHeadersStatus::Continue
+    }
+
+    fn response_headers(
+        &mut self,
+        _response_headers: &ResponseHeaders,
+        _end_of_stream: bool,
+    ) -> ResponseHeadersStatus {
+        if self.on_response_headers {
+            let headers: Vec<(&[u8], &[u8])> = vec![("dog".as_bytes(), "cat".as_bytes())];
+            self.envoy_filter_instance.send_response(
+                500,
+                headers.as_slice(),
+                "local response at response headers".as_bytes(),
+            );
+        }
+        ResponseHeadersStatus::Continue
     }
 }

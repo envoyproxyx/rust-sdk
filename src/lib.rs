@@ -302,6 +302,32 @@ impl EnvoyFilterInstance {
             unsafe { abi::__envoy_dynamic_module_v1_http_get_response_body_buffer(self.raw_addr) };
         ResponseBodyBuffer { raw: buffer }
     }
+
+    /// Sends the response to the downstream.
+    ///
+    /// * `status_code` is the HTTP status code.
+    /// * `headers` is the list of headers. Each header is a tuple of key and value.
+    /// * `body` is the response body.
+    pub fn send_response(&self, status_code: u32, headers: &[(&[u8], &[u8])], body: &[u8]) {
+        let headers_ptr = if headers.is_empty() {
+            ptr::null()
+        } else {
+            &headers[0] as *const _ as *const u8
+        };
+        let headers_size = headers.len();
+        let body_ptr = body.as_ptr();
+        let body_size = body.len();
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_send_response(
+                self.raw_addr,
+                status_code,
+                headers_ptr as usize,
+                headers_size,
+                body_ptr as usize,
+                body_size,
+            )
+        }
+    }
 }
 
 /// An opaque object that represents the underlying Envoy Http request headers map.
