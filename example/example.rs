@@ -14,7 +14,9 @@ fn new_http_filter(config: &str) -> Box<dyn HttpFilter> {
     // Each filter is written in a way that it passes the conformance tests.
     match config {
         "helloworld" => Box::new(HelloWorldFilter {}),
-        "delay" => Box::new(DelayFilter::default()),
+        "delay" => Box::new(DelayFilter {
+            atomic: std::sync::atomic::AtomicUsize::new(0),
+        }),
         "headers" => Box::new(HeadersFilter {}),
         "bodies" => Box::new(BodiesFilter {}),
         "bodies_replace" => Box::new(BodiesReplace {}),
@@ -169,14 +171,6 @@ impl HttpFilterInstance for HeadersFilterInstance {
 /// This implements the [`HttpFilter`] trait, and will be created per each filter chain.
 struct DelayFilter {
     atomic: std::sync::atomic::AtomicUsize,
-}
-
-impl Default for DelayFilter {
-    fn default() -> Self {
-        DelayFilter {
-            atomic: std::sync::atomic::AtomicUsize::new(1),
-        }
-    }
 }
 
 impl HttpFilter for DelayFilter {
