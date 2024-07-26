@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use envoy_dynamic_modules_rust_sdk::*;
 
 init!(new_http_filter);
@@ -6,9 +8,10 @@ init!(new_http_filter);
 ///
 /// This function is called by the Envoy corresponding to the filter chain configuration.
 fn new_http_filter(config: &str) -> Box<dyn HttpFilter> {
+    // Each filter is written in a way that it passes the conformance tests.
     match config {
         "helloworld" => Box::new(HelloWorldFilter {}),
-        "delay" => Box::new(HelloWorldFilter {}), // TODO:
+        "delay" => Box::new(DelayFilter::default()),
         "headers" => Box::new(HeadersFilter {}),
         "bodies" => Box::new(HelloWorldFilter {}), // TODO:
         "bodies_replace" => Box::new(HelloWorldFilter {}), // TODO:
@@ -93,10 +96,6 @@ impl HttpFilter for HeadersFilter {
     ) -> Box<dyn HttpFilterInstance> {
         Box::new(HeadersFilterInstance {})
     }
-
-    fn destroy(&self) {
-        println!("HeadersFilter destroyed");
-    }
 }
 
 /// HeadersFilterInstance is a filter instance that manipulates headers.
@@ -159,5 +158,168 @@ impl HttpFilterInstance for HeadersFilterInstance {
         response_headers.set("multiple-values-res-to-be-single", "single");
 
         EventHttpResponseHeadersStatus::Continue
+    }
+}
+
+/// DelayFilter is a filter that delays the request.
+///
+/// This implements the [`HttpFilter`] trait, and will be created per each filter chain.
+struct DelayFilter {
+    atomic: std::sync::atomic::AtomicUsize,
+}
+
+impl Default for DelayFilter {
+    fn default() -> Self {
+        DelayFilter {
+            atomic: std::sync::atomic::AtomicUsize::new(1),
+        }
+    }
+}
+
+impl HttpFilter for DelayFilter {
+    fn new_instance(
+        &mut self,
+        envoy_filter_instance: EnvoyFilterInstance,
+    ) -> Box<dyn HttpFilterInstance> {
+        let req_no = self
+            .atomic
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+
+        let envoy_filter_instance = Arc::new(Mutex::new(Some(envoy_filter_instance)));
+        Box::new(DelayFilterInstance {
+            req_no,
+            envoy_filter_instance,
+        })
+    }
+}
+
+/// DelayFilterInstance is a filter instance that delays the request.
+///
+/// This implements the [`HttpFilterInstance`] trait, and will be created per each request.
+struct DelayFilterInstance {
+    req_no: usize,
+    envoy_filter_instance: Arc<Mutex<Option<EnvoyFilterInstance>>>,
+}
+
+impl HttpFilterInstance for DelayFilterInstance {
+    fn request_headers(
+        &mut self,
+        _request_headers: &RequestHeaders,
+        _end_of_stream: bool,
+    ) -> EventHttpRequestHeadersStatus {
+        if self.req_no == 1 {
+            let envoy_filter_instance = self.envoy_filter_instance.clone();
+            let req_no = self.req_no;
+            std::thread::spawn(move || {
+                println!("blocking for 1 second at RequestHeaders with id {}", req_no);
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                println!("calling ContinueRequest with id {}", req_no);
+                if let Some(envoy_filter_instance) = envoy_filter_instance.lock().unwrap().as_ref()
+                {
+                    envoy_filter_instance.continue_request();
+                }
+            });
+            println!(
+                "RequestHeaders returning StopAllIterationAndBuffer with id {}",
+                self.req_no
+            );
+            EventHttpRequestHeadersStatus::StopAllIterationAndBuffer
+        } else {
+            println!("RequestHeaders called with id {}", self.req_no);
+            EventHttpRequestHeadersStatus::Continue
+        }
+    }
+
+    fn request_body(
+        &mut self,
+        _request_body: &RequestBodyBuffer,
+        _end_of_stream: bool,
+    ) -> EventHttpRequestBodyStatus {
+        if self.req_no == 2 {
+            let envoy_filter_instance = self.envoy_filter_instance.clone();
+            let req_no = self.req_no;
+            std::thread::spawn(move || {
+                println!("blocking for 1 second at RequestBody with id {}", req_no);
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                println!("calling ContinueRequest with id {}", req_no);
+                if let Some(envoy_filter_instance) = envoy_filter_instance.lock().unwrap().as_ref()
+                {
+                    envoy_filter_instance.continue_request();
+                }
+            });
+            println!(
+                "RequestBody returning StopIterationAndBuffer with id {}",
+                self.req_no
+            );
+            EventHttpRequestBodyStatus::StopIterationAndBuffer
+        } else {
+            println!("RequestBody called with id {}", self.req_no);
+            EventHttpRequestBodyStatus::Continue
+        }
+    }
+
+    fn response_headers(
+        &mut self,
+        _response_headers: &ResponseHeaders,
+        _end_of_stream: bool,
+    ) -> EventHttpResponseHeadersStatus {
+        if self.req_no == 3 {
+            let envoy_filter_instance = self.envoy_filter_instance.clone();
+            let req_no = self.req_no;
+            std::thread::spawn(move || {
+                println!(
+                    "blocking for 1 second at ResponseHeaders with id {}",
+                    req_no
+                );
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                println!("calling ContinueResponse with id {}", req_no);
+                if let Some(envoy_filter_instance) = envoy_filter_instance.lock().unwrap().as_ref()
+                {
+                    envoy_filter_instance.continue_response();
+                }
+            });
+            println!(
+                "ResponseHeaders returning StopAllIterationAndBuffer with id {}",
+                self.req_no
+            );
+
+            EventHttpResponseHeadersStatus::StopAllIterationAndBuffer
+        } else {
+            println!("ResponseHeaders called with id {}", self.req_no);
+            EventHttpResponseHeadersStatus::Continue
+        }
+    }
+
+    fn response_body(
+        &mut self,
+        _response_body: &ResponseBodyBuffer,
+        _end_of_stream: bool,
+    ) -> EventHttpResponseBodyStatus {
+        if self.req_no == 4 {
+            let envoy_filter_instance = self.envoy_filter_instance.clone();
+            let req_no = self.req_no;
+            std::thread::spawn(move || {
+                println!("blocking for 1 second at ResponseBody with id {}", req_no);
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                println!("calling ContinueResponse with id {}", req_no);
+                if let Some(envoy_filter_instance) = envoy_filter_instance.lock().unwrap().as_ref()
+                {
+                    envoy_filter_instance.continue_response();
+                }
+            });
+            println!(
+                "ResponseBody returning StopIterationAndBuffer with id {}",
+                self.req_no
+            );
+
+            EventHttpResponseBodyStatus::StopIterationAndBuffer
+        } else {
+            println!("ResponseBody called with id {}", self.req_no);
+            EventHttpResponseBodyStatus::Continue
+        }
+    }
+
+    fn destroy(&mut self) {
+        *self.envoy_filter_instance.lock().unwrap() = None;
     }
 }
