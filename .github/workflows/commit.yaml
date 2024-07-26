@@ -71,5 +71,7 @@ jobs:
         echo $ENVOY_BIN_DIR >> $GITHUB_PATH
 
     - name: Conformance tests
-      run: go run github.com/mathetake/envoy-dynamic-modules-sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so --target=TestHelloWorld
+      run: | 
+        go run github.com/mathetake/envoy-dynamic-modules-sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so --target=TestHelloWorld
+        go run github.com/mathetake/envoy-dynamic-modules-sdk-conformance-tests@main --shared-library-path=./target/debug/examples/libexample.so --target=TestHeaders
   

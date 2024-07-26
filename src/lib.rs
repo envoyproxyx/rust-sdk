@@ -3,13 +3,14 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+use std::ptr;
+
 mod abi {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
 /// Define the init function for the module.
 /// This macro should be used in the root of the module.
-/// The code block passed to the macro will be executed exactly when the module is loaded.
 #[macro_export]
 macro_rules! init {
     ($new_filter_fn:expr) => {
@@ -180,9 +181,11 @@ pub trait HttpFilterInstance {
     /// * `end_of_stream` is a boolean that indicates if this is the headers-only request.
     fn request_headers(
         &mut self,
-        request_headers: &RequestHeaders,
-        end_of_stream: bool,
-    ) -> EventHttpRequestHeadersStatus;
+        _request_headers: &RequestHeaders,
+        _end_of_stream: bool,
+    ) -> EventHttpRequestHeadersStatus {
+        EventHttpRequestHeadersStatus::Continue
+    }
 
     /// This is called when request body data is received.
     /// The function should return the status of the operation.
@@ -191,9 +194,11 @@ pub trait HttpFilterInstance {
     /// * `end_of_stream` is a boolean that indicates if this is the last data frame.
     fn request_body(
         &mut self,
-        request_body: &RequestBodyBuffer,
-        end_of_stream: bool,
-    ) -> EventHttpRequestBodyStatus;
+        _request_body: &RequestBodyBuffer,
+        _end_of_stream: bool,
+    ) -> EventHttpRequestBodyStatus {
+        EventHttpRequestBodyStatus::Continue
+    }
 
     /// This is called when response headers are received.
     /// The function should return the status of the operation.
@@ -202,9 +207,11 @@ pub trait HttpFilterInstance {
     /// * `end_of_stream` is a boolean that indicates if this is the headers-only response.
     fn response_headers(
         &mut self,
-        response_headers: &ResponseHeaders,
-        end_of_stream: bool,
-    ) -> EventHttpResponseHeadersStatus;
+        _response_headers: &ResponseHeaders,
+        _end_of_stream: bool,
+    ) -> EventHttpResponseHeadersStatus {
+        EventHttpResponseHeadersStatus::Continue
+    }
 
     /// This is called when response body data is received.
     /// The function should return the status of the operation.
@@ -213,14 +220,16 @@ pub trait HttpFilterInstance {
     /// * `end_of_stream` is a boolean that indicates if this is the last data frame.
     fn response_body(
         &mut self,
-        response_body: &ResponseBodyBuffer,
-        end_of_stream: bool,
-    ) -> EventHttpResponseBodyStatus;
+        _response_body: &ResponseBodyBuffer,
+        _end_of_stream: bool,
+    ) -> EventHttpResponseBodyStatus {
+        EventHttpResponseBodyStatus::Continue
+    }
 
     /// This is called when the stream is completed or when the stream is reset.
     ///
     /// After this returns, this object is destructed.
-    fn destroy(&mut self);
+    fn destroy(&mut self) {}
 }
 
 /// An opaque object that represents the underlying Envoy Http filter instance.
@@ -256,6 +265,120 @@ pub struct RequestHeaders {
     raw: abi::__envoy_dynamic_module_v1_type_HttpRequestHeadersMapPtr,
 }
 
+impl RequestHeaders {
+    /// Returns the first header value for the given key. To handle multiple values, use the [`RequestHeaders::Values`] method.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        let key_ptr = key.as_ptr();
+        let key_size = key.len();
+
+        let mut result_ptr: *const u8 = ptr::null();
+        let mut result_size: usize = 0;
+
+        let total = unsafe {
+            abi::__envoy_dynamic_module_v1_http_get_request_header_value(
+                self.raw,
+                key_ptr as *const _ as usize,
+                key_size,
+                &mut result_ptr as *mut _ as usize,
+                &mut result_size as *mut _ as usize,
+            )
+        };
+
+        if total == 0 {
+            return None;
+        }
+
+        // Convert the result to a Rust string slice
+        let result_slice = unsafe { std::slice::from_raw_parts(result_ptr, result_size) };
+        let result_str = std::str::from_utf8(result_slice).unwrap();
+
+        Some(result_str)
+    }
+
+    /// Returns all the header values for the given key.
+    pub fn values(&self, key: &str) -> Vec<&str> {
+        let key_ptr = key.as_ptr();
+        let key_size = key.len();
+
+        let mut result_ptr: *const u8 = ptr::null();
+        let mut result_size: usize = 0;
+
+        let mut values = Vec::new();
+        let total = unsafe {
+            abi::__envoy_dynamic_module_v1_http_get_request_header_value(
+                self.raw,
+                key_ptr as *const _ as usize,
+                key_size,
+                &mut result_ptr as *mut _ as usize,
+                &mut result_size as *mut _ as usize,
+            )
+        };
+
+        if total == 0 {
+            return values;
+        }
+
+        values = Vec::with_capacity(total as usize);
+        values.push(unsafe {
+            std::str::from_utf8(std::slice::from_raw_parts(result_ptr, result_size)).unwrap()
+        });
+
+        for i in 1..total {
+            unsafe {
+                abi::__envoy_dynamic_module_v1_http_get_request_header_value_nth(
+                    self.raw,
+                    key_ptr as *const _ as usize,
+                    key_size,
+                    &mut result_ptr as *mut _ as usize,
+                    &mut result_size as *mut _ as usize,
+                    i,
+                );
+            }
+            values.push(unsafe {
+                std::str::from_utf8(std::slice::from_raw_parts(result_ptr, result_size)).unwrap()
+            });
+        }
+
+        values
+    }
+
+    /// Sets the value for the given key. If multiple values are set for the same key,
+    /// this removes all the previous values and sets the new single value.
+    pub fn set(&self, key: &str, value: &str) {
+        let key_ptr = key.as_ptr();
+        let key_size = key.len();
+        let value_ptr = value.as_ptr();
+        let value_size = value.len();
+
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_set_request_header(
+                self.raw,
+                key_ptr as *const _ as usize,
+                key_size,
+                value_ptr as *const _ as usize,
+                value_size,
+            )
+        }
+    }
+
+    /// Removes the value for the given key. If multiple values are set for the same key,
+    /// this removes all the values.
+    pub fn remove(&self, key: &str) {
+        let key_ptr = key.as_ptr();
+        let key_size = key.len();
+
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_set_request_header(
+                self.raw,
+                key_ptr as *const _ as usize,
+                key_size,
+                0,
+                0,
+            )
+        }
+    }
+}
+
 /// An opaque object that represents the underlying Envoy Http request body buffer.
 /// This is used to interact with it from the module code.
 pub struct RequestBodyBuffer {
@@ -266,6 +389,118 @@ pub struct RequestBodyBuffer {
 /// This is used to interact with it from the module code.
 pub struct ResponseHeaders {
     raw: abi::__envoy_dynamic_module_v1_type_HttpResponseHeaderMapPtr,
+}
+
+impl ResponseHeaders {
+    /// Returns the first header value for the given key. To handle multiple values, use the [`ResponseHeaders::Values`] method.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        let key_ptr = key.as_ptr();
+        let key_size = key.len();
+
+        let mut result_ptr: *const u8 = ptr::null();
+        let mut result_size: usize = 0;
+
+        let total = unsafe {
+            abi::__envoy_dynamic_module_v1_http_get_response_header_value(
+                self.raw,
+                key_ptr as *const _ as usize,
+                key_size,
+                &mut result_ptr as *mut _ as usize,
+                &mut result_size as *mut _ as usize,
+            )
+        };
+
+        if total == 0 {
+            return None;
+        }
+
+        // Convert the result to a Rust string slice
+        let result_slice = unsafe { std::slice::from_raw_parts(result_ptr, result_size) };
+        let result_str = std::str::from_utf8(result_slice).unwrap();
+
+        Some(result_str)
+    }
+
+    /// Returns all the header values for the given key.
+    pub fn values(&self, key: &str) -> Vec<&str> {
+        let key_ptr = key.as_ptr();
+        let key_size = key.len();
+
+        let mut result_ptr: *const u8 = ptr::null();
+        let mut result_size: usize = 0;
+
+        let mut values = Vec::new();
+        let total = unsafe {
+            abi::__envoy_dynamic_module_v1_http_get_response_header_value(
+                self.raw,
+                key_ptr as *const _ as usize,
+                key_size,
+                &mut result_ptr as *mut _ as usize,
+                &mut result_size as *mut _ as usize,
+            )
+        };
+
+        if total == 0 {
+            return values;
+        }
+
+        values = Vec::with_capacity(total as usize);
+        values.push(unsafe {
+            std::str::from_utf8(std::slice::from_raw_parts(result_ptr, result_size)).unwrap()
+        });
+
+        for i in 1..total {
+            unsafe {
+                abi::__envoy_dynamic_module_v1_http_get_response_header_value_nth(
+                    self.raw,
+                    key_ptr as *const _ as usize,
+                    key_size,
+                    &mut result_ptr as *mut _ as usize,
+                    &mut result_size as *mut _ as usize,
+                    i,
+                );
+            }
+            values.push(unsafe {
+                std::str::from_utf8(std::slice::from_raw_parts(result_ptr, result_size)).unwrap()
+            });
+        }
+
+        values
+    }
+
+    /// Sets the value for the given key. If multiple values are set for the same key,
+    pub fn set(&self, key: &str, value: &str) {
+        let key_ptr = key.as_ptr();
+        let key_size = key.len();
+        let value_ptr = value.as_ptr();
+        let value_size = value.len();
+
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_set_response_header(
+                self.raw,
+                key_ptr as *const _ as usize,
+                key_size,
+                value_ptr as *const _ as usize,
+                value_size,
+            )
+        }
+    }
+
+    /// Removes the value for the given key. If multiple values are set for the same key,
+    pub fn remove(&self, key: &str) {
+        let key_ptr = key.as_ptr();
+        let key_size = key.len();
+
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_set_response_header(
+                self.raw,
+                key_ptr as *const _ as usize,
+                key_size,
+                0,
+                0,
+            )
+        }
+    }
 }
 
 /// An opaque object that represents the underlying Envoy Http response body buffer.
