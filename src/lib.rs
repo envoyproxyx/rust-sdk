@@ -473,6 +473,25 @@ impl RequestBodyBuffer {
         slices
     }
 
+    fn slice_at(&self, index: usize) -> Option<&mut [u8]> {
+        if index >= self.slices_count() {
+            return None;
+        }
+
+        let mut slice_ptr: *mut u8 = ptr::null_mut();
+        let mut slice_size: usize = 0;
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_get_request_body_buffer_slice(
+                self.raw,
+                index,
+                &mut slice_ptr as *mut _ as usize,
+                &mut slice_size as *mut _ as usize,
+            );
+        }
+
+        Some(unsafe { std::slice::from_raw_parts_mut(slice_ptr, slice_size) })
+    }
+
     /// Copies the entire buffer into a single contiguous Vec<u8> managed in Rust.
     pub fn copy(&self) -> Vec<u8> {
         let mut buffer = Vec::new();
@@ -481,6 +500,58 @@ impl RequestBodyBuffer {
             buffer.extend_from_slice(slice);
         }
         buffer
+    }
+
+    /// Returns a reader that implements the [`std::io::Read`] trait.
+    pub fn reader(&self) -> RequestBodyBufferReader {
+        RequestBodyBufferReader::from(*self)
+    }
+}
+
+pub struct RequestBodyBufferReader {
+    buffer: RequestBodyBuffer,
+    // The current index of the slice.
+    current_slice_index: usize,
+    // The current offset in the current slice.
+    current_slice_offset: usize,
+}
+
+impl From<RequestBodyBuffer> for RequestBodyBufferReader {
+    fn from(buffer: RequestBodyBuffer) -> Self {
+        RequestBodyBufferReader {
+            buffer,
+            current_slice_index: 0,
+            current_slice_offset: 0,
+        }
+    }
+}
+
+impl std::io::Read for RequestBodyBufferReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // TODO: below obviously can be optimized. But for now, this is fine for the PoC.
+        let mut total_read = 0;
+        while total_read < buf.len() {
+            let current_slice = match self.buffer.slice_at(self.current_slice_index) {
+                Some(slice) => slice,
+                None => break,
+            };
+            let current_slice_len = current_slice.len();
+            if self.current_slice_offset >= current_slice_len {
+                self.current_slice_offset = 0;
+                self.current_slice_index += 1;
+                continue;
+            }
+
+            let remaining = buf.len() - total_read;
+            let remaining_slice = current_slice_len - self.current_slice_offset;
+            let read_size = std::cmp::min(remaining, remaining_slice);
+            buf[total_read..total_read + read_size].copy_from_slice(
+                &current_slice[self.current_slice_offset..self.current_slice_offset + read_size],
+            );
+            self.current_slice_offset += read_size;
+            total_read += read_size;
+        }
+        Ok(total_read)
     }
 }
 
@@ -613,8 +684,6 @@ impl ResponseHeaders {
 /// This corresponds to either a frame of the response body or the whole body.
 ///
 /// This is a shallow wrapper around the raw pointer to the Envoy response body buffer.
-///
-/// TODO: implement the `std::io::Read` trait for this object.
 #[derive(Debug, Clone, Copy)]
 pub struct ResponseBodyBuffer {
     raw: abi::__envoy_dynamic_module_v1_type_HttpResponseBodyBufferPtr,
@@ -653,6 +722,25 @@ impl ResponseBodyBuffer {
         slices
     }
 
+    fn slice_at(&self, index: usize) -> Option<&mut [u8]> {
+        if index >= self.slices_count() {
+            return None;
+        }
+
+        let mut slice_ptr: *mut u8 = ptr::null_mut();
+        let mut slice_size: usize = 0;
+        unsafe {
+            abi::__envoy_dynamic_module_v1_http_get_response_body_buffer_slice(
+                self.raw,
+                index,
+                &mut slice_ptr as *mut _ as usize,
+                &mut slice_size as *mut _ as usize,
+            );
+        }
+
+        Some(unsafe { std::slice::from_raw_parts_mut(slice_ptr, slice_size) })
+    }
+
     /// Copies the entire buffer into a single contiguous Vec<u8> managed in Rust.
     pub fn copy(&self) -> Vec<u8> {
         let mut buffer = Vec::new();
@@ -661,6 +749,59 @@ impl ResponseBodyBuffer {
             buffer.extend_from_slice(slice);
         }
         buffer
+    }
+
+    /// Returns a reader that implements the [`std::io::Read`] trait.
+    pub fn reader(&self) -> ResponseBodyBufferReader {
+        ResponseBodyBufferReader::from(*self)
+    }
+}
+
+/// This implements the [`std::io::Read`] trait for the [`ResponseBodyBuffer`] object.]
+pub struct ResponseBodyBufferReader {
+    buffer: ResponseBodyBuffer,
+    // The current index of the slice.
+    current_slice_index: usize,
+    // The current offset in the current slice.
+    current_slice_offset: usize,
+}
+
+impl From<ResponseBodyBuffer> for ResponseBodyBufferReader {
+    fn from(buffer: ResponseBodyBuffer) -> Self {
+        ResponseBodyBufferReader {
+            buffer,
+            current_slice_index: 0,
+            current_slice_offset: 0,
+        }
+    }
+}
+
+impl std::io::Read for ResponseBodyBufferReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // TODO: below obviously can be optimized. But for now, this is fine for the PoC.
+        let mut total_read = 0;
+        while total_read < buf.len() {
+            let current_slice = match self.buffer.slice_at(self.current_slice_index) {
+                Some(slice) => slice,
+                None => break,
+            };
+            let current_slice_len = current_slice.len();
+            if self.current_slice_offset >= current_slice_len {
+                self.current_slice_offset = 0;
+                self.current_slice_index += 1;
+                continue;
+            }
+
+            let remaining = buf.len() - total_read;
+            let remaining_slice = current_slice_len - self.current_slice_offset;
+            let read_size = std::cmp::min(remaining, remaining_slice);
+            buf[total_read..total_read + read_size].copy_from_slice(
+                &current_slice[self.current_slice_offset..self.current_slice_offset + read_size],
+            );
+            self.current_slice_offset += read_size;
+            total_read += read_size;
+        }
+        Ok(total_read)
     }
 }
 

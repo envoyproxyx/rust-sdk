@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    io::Read,
+    sync::{Arc, Mutex},
+};
 
 use envoy_dynamic_modules_rust_sdk::*;
 
@@ -369,6 +372,23 @@ impl HttpFilterInstance for BodiesFilterInstance {
             String::from_utf8(entire_body.copy()).unwrap()
         );
 
+        // This demonstrates how to use the reader to read the body.
+        let mut reader = entire_body.reader();
+        let mut buf = vec![0; 2];
+        let mut offset = 0;
+        loop {
+            let n = reader.read(&mut buf).unwrap();
+            if n == 0 {
+                break;
+            }
+            println!(
+                "request body read 2 bytes offset at {}: \"{}\"",
+                offset,
+                std::str::from_utf8(&buf[..n]).unwrap()
+            );
+            offset += 2;
+        }
+
         // Replace the entire body with 'Y' without copying.
         for i in entire_body.slices() {
             for j in i {
@@ -398,6 +418,23 @@ impl HttpFilterInstance for BodiesFilterInstance {
             "entire response body: {}",
             String::from_utf8(entire_body.copy()).unwrap()
         );
+
+        // This demonstrates how to use the reader to read the body.
+        let mut reader = entire_body.reader();
+        let mut buf = vec![0; 2];
+        let mut offset = 0;
+        loop {
+            let n = reader.read(&mut buf).unwrap();
+            if n == 0 {
+                break;
+            }
+            println!(
+                "response body read 2 bytes offset at {}: \"{}\"",
+                offset,
+                std::str::from_utf8(&buf[..n]).unwrap()
+            );
+            offset += 2;
+        }
 
         // Replace the entire body with 'Y' without copying.
         for i in entire_body.slices() {
