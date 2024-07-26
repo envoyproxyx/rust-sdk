@@ -2,6 +2,9 @@ use envoy_dynamic_modules_rust_sdk::*;
 
 init!(new_http_filter);
 
+/// new_http_filter is the entry point for the filter chains.
+///
+/// This function is called by the Envoy corresponding to the filter chain configuration.
 fn new_http_filter(config: &str) -> Box<dyn HttpFilter> {
     match config {
         "helloworld" => Box::new(HelloWorldFilter {}),

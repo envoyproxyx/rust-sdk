@@ -11,6 +11,36 @@ mod abi {
 
 /// Define the init function for the module.
 /// This macro should be used in the root of the module.
+///
+/// ## Arguments
+///
+/// * `$new_filter_fn` - The function that creates a new HttpFilter object: `fn(&str) -> Box<dyn HttpFilter>`.
+///  This function is called for each new filter chain configuration and should return a new HttpFilter object
+///  based on the configuration string.
+///
+/// ## Example
+///
+/// ```
+/// use envoy_dynamic_modules_rust_sdk::*;
+///
+/// struct HelloWorldFilter {}
+/// struct HelloWorldFilterInstance {}
+///
+/// impl HttpFilter for HelloWorldFilter {
+///    fn new_instance(&mut self, _envoy_filter_instance: EnvoyFilterInstance) -> Box<dyn HttpFilterInstance> {
+///       Box::new(HelloWorldFilterInstance {})
+///   }
+/// }
+///
+/// impl HttpFilterInstance for HelloWorldFilterInstance {}
+///
+/// fn new_http_filter(config: &str) -> Box<dyn HttpFilter> {
+///    match config {
+///       "helloworld" => Box::new(HelloWorldFilter {}),
+///      _ => panic!("Unknown config: {}", config),
+///    }
+/// }
+/// init!(new_http_filter);
 #[macro_export]
 macro_rules! init {
     ($new_filter_fn:expr) => {
@@ -167,7 +197,7 @@ pub trait HttpFilter {
     /// destroy is called when this filter is destroyed. E.g. the filter chain configuration is updated and removed from the Envoy.
     ///
     /// After this returns, the filter object is destructed.
-    fn destroy(&self);
+    fn destroy(&self) {}
 }
 
 /// HttpFilterInstance is a trait that represents each HTTP request.
