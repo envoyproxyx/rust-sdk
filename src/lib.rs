@@ -213,8 +213,8 @@ pub trait HttpFilterInstance {
         &mut self,
         _request_headers: &RequestHeaders,
         _end_of_stream: bool,
-    ) -> EventHttpRequestHeadersStatus {
-        EventHttpRequestHeadersStatus::Continue
+    ) -> RequestHeadersStatus {
+        RequestHeadersStatus::Continue
     }
 
     /// This is called when request body data is received.
@@ -226,8 +226,8 @@ pub trait HttpFilterInstance {
         &mut self,
         _request_body: &RequestBodyBuffer,
         _end_of_stream: bool,
-    ) -> EventHttpRequestBodyStatus {
-        EventHttpRequestBodyStatus::Continue
+    ) -> RequestBodyStatus {
+        RequestBodyStatus::Continue
     }
 
     /// This is called when response headers are received.
@@ -239,8 +239,8 @@ pub trait HttpFilterInstance {
         &mut self,
         _response_headers: &ResponseHeaders,
         _end_of_stream: bool,
-    ) -> EventHttpResponseHeadersStatus {
-        EventHttpResponseHeadersStatus::Continue
+    ) -> ResponseHeadersStatus {
+        ResponseHeadersStatus::Continue
     }
 
     /// This is called when response body data is received.
@@ -252,8 +252,8 @@ pub trait HttpFilterInstance {
         &mut self,
         _response_body: &ResponseBodyBuffer,
         _end_of_stream: bool,
-    ) -> EventHttpResponseBodyStatus {
-        EventHttpResponseBodyStatus::Continue
+    ) -> ResponseBodyStatus {
+        ResponseBodyStatus::Continue
     }
 
     /// This is called when the stream is completed or when the stream is reset.
@@ -540,7 +540,7 @@ pub struct ResponseBodyBuffer {
 }
 
 /// The status of the processing after the [`HttpFilterInstance::request_headers`] is called.
-pub enum EventHttpRequestHeadersStatus {
+pub enum RequestHeadersStatus {
     /// Should be returned when the operation should continue.
     Continue,
     /// This indicates that Envoy shouldn't continue from processing the headers and should
@@ -559,18 +559,18 @@ pub enum EventHttpRequestHeadersStatus {
     StopAllIterationAndBuffer,
 }
 
-impl From<EventHttpRequestHeadersStatus>
+impl From<RequestHeadersStatus>
     for abi::__envoy_dynamic_module_v1_type_EventHttpRequestHeadersStatus
 {
-    fn from(val: EventHttpRequestHeadersStatus) -> Self {
+    fn from(val: RequestHeadersStatus) -> Self {
         match val {
-            EventHttpRequestHeadersStatus::Continue => {
+            RequestHeadersStatus::Continue => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpRequestHeadersStatusContinue
             }
-            EventHttpRequestHeadersStatus::StopIteration => {
+            RequestHeadersStatus::StopIteration => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpRequestHeadersStatusStopIteration
             }
-            EventHttpRequestHeadersStatus::StopAllIterationAndBuffer => {
+            RequestHeadersStatus::StopAllIterationAndBuffer => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpRequestHeadersStatusStopAllIterationAndBuffer
             }
             _ => {
@@ -581,7 +581,7 @@ impl From<EventHttpRequestHeadersStatus>
 }
 
 /// The status of the processing after the [`HttpFilterInstance::response_headers`] is called.
-pub enum EventHttpRequestBodyStatus {
+pub enum RequestBodyStatus {
     /// Should be returned when the operation should continue.
     Continue,
     /// This indicates that Envoy shouldn't continue from processing the body frame and should stop iteration,
@@ -594,15 +594,13 @@ pub enum EventHttpRequestBodyStatus {
     StopIterationAndBuffer,
 }
 
-impl From<EventHttpRequestBodyStatus>
-    for abi::__envoy_dynamic_module_v1_type_EventHttpRequestBodyStatus
-{
-    fn from(val: EventHttpRequestBodyStatus) -> Self {
+impl From<RequestBodyStatus> for abi::__envoy_dynamic_module_v1_type_EventHttpRequestBodyStatus {
+    fn from(val: RequestBodyStatus) -> Self {
         match val {
-            EventHttpRequestBodyStatus::Continue => {
+            RequestBodyStatus::Continue => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpRequestBodyStatusContinue
             }
-            EventHttpRequestBodyStatus::StopIterationAndBuffer => {
+            RequestBodyStatus::StopIterationAndBuffer => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpRequestBodyStatusStopIterationAndBuffer
             }
         }
@@ -610,7 +608,7 @@ impl From<EventHttpRequestBodyStatus>
 }
 
 /// The status of the processing after the [`HttpFilterInstance::response_headers`] is called.
-pub enum EventHttpResponseHeadersStatus {
+pub enum ResponseHeadersStatus {
     /// Should be returned when the operation should continue.
     Continue,
     /// This indicates that Envoy shouldn't continue from processing the headers and should
@@ -629,18 +627,18 @@ pub enum EventHttpResponseHeadersStatus {
     StopAllIterationAndBuffer,
 }
 
-impl From<EventHttpResponseHeadersStatus>
+impl From<ResponseHeadersStatus>
     for abi::__envoy_dynamic_module_v1_type_EventHttpResponseHeadersStatus
 {
-    fn from(val: EventHttpResponseHeadersStatus) -> Self {
+    fn from(val: ResponseHeadersStatus) -> Self {
         match val {
-            EventHttpResponseHeadersStatus::Continue => {
+            ResponseHeadersStatus::Continue => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpResponseHeadersStatusContinue
             }
-            EventHttpResponseHeadersStatus::StopIteration => {
+            ResponseHeadersStatus::StopIteration => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpResponseHeadersStatusStopIteration
             }
-            EventHttpResponseHeadersStatus::StopAllIterationAndBuffer => {
+            ResponseHeadersStatus::StopAllIterationAndBuffer => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpResponseHeadersStatusStopAllIterationAndBuffer
             }
             _ => {
@@ -651,7 +649,7 @@ impl From<EventHttpResponseHeadersStatus>
 }
 
 /// The status of the processing after the [`HttpFilterInstance::response_body`] is called.
-pub enum EventHttpResponseBodyStatus {
+pub enum ResponseBodyStatus {
     /// Should be returned when the operation should continue.
     Continue,
     /// This indicates that Envoy shouldn't continue from processing the body frame and should stop iteration,
@@ -664,15 +662,13 @@ pub enum EventHttpResponseBodyStatus {
     StopIterationAndBuffer,
 }
 
-impl From<EventHttpResponseBodyStatus>
-    for abi::__envoy_dynamic_module_v1_type_EventHttpResponseBodyStatus
-{
-    fn from(val: EventHttpResponseBodyStatus) -> Self {
+impl From<ResponseBodyStatus> for abi::__envoy_dynamic_module_v1_type_EventHttpResponseBodyStatus {
+    fn from(val: ResponseBodyStatus) -> Self {
         match val {
-            EventHttpResponseBodyStatus::Continue => {
+            ResponseBodyStatus::Continue => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpResponseBodyStatusContinue
             }
-            EventHttpResponseBodyStatus::StopIterationAndBuffer => {
+            ResponseBodyStatus::StopIterationAndBuffer => {
                 abi::__envoy_dynamic_module_v1_type_EventHttpResponseBodyStatusStopIterationAndBuffer
             }
         }

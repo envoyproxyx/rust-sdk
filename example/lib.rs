@@ -47,36 +47,36 @@ impl HttpFilterInstance for HelloWorldFilterInstance {
         &mut self,
         _request_headers: &RequestHeaders,
         _end_of_stream: bool,
-    ) -> EventHttpRequestHeadersStatus {
+    ) -> RequestHeadersStatus {
         println!("RequestHeaders called");
-        EventHttpRequestHeadersStatus::Continue
+        RequestHeadersStatus::Continue
     }
 
     fn request_body(
         &mut self,
         _request_body: &RequestBodyBuffer,
         _end_of_stream: bool,
-    ) -> EventHttpRequestBodyStatus {
+    ) -> RequestBodyStatus {
         println!("RequestBody called");
-        EventHttpRequestBodyStatus::Continue
+        RequestBodyStatus::Continue
     }
 
     fn response_headers(
         &mut self,
         _response_headers: &ResponseHeaders,
         _end_of_stream: bool,
-    ) -> EventHttpResponseHeadersStatus {
+    ) -> ResponseHeadersStatus {
         println!("ResponseHeaders called");
-        EventHttpResponseHeadersStatus::Continue
+        ResponseHeadersStatus::Continue
     }
 
     fn response_body(
         &mut self,
         _response_body: &ResponseBodyBuffer,
         _end_of_stream: bool,
-    ) -> EventHttpResponseBodyStatus {
+    ) -> ResponseBodyStatus {
         println!("ResponseBody called");
-        EventHttpResponseBodyStatus::Continue
+        ResponseBodyStatus::Continue
     }
 
     fn destroy(&mut self) {
@@ -108,7 +108,7 @@ impl HttpFilterInstance for HeadersFilterInstance {
         &mut self,
         request_headers: &RequestHeaders,
         _end_of_stream: bool,
-    ) -> EventHttpRequestHeadersStatus {
+    ) -> RequestHeadersStatus {
         if let Some(value) = request_headers.get("foo") {
             if value != "value" {
                 panic!("expected this-is to be \"value\", got {:?}", value);
@@ -127,14 +127,14 @@ impl HttpFilterInstance for HeadersFilterInstance {
         request_headers.remove("multiple-values");
         request_headers.set("foo", "yes");
         request_headers.set("multiple-values-to-be-single", "single");
-        EventHttpRequestHeadersStatus::Continue
+        RequestHeadersStatus::Continue
     }
 
     fn response_headers(
         &mut self,
         response_headers: &ResponseHeaders,
         _end_of_stream: bool,
-    ) -> EventHttpResponseHeadersStatus {
+    ) -> ResponseHeadersStatus {
         if let Some(value) = response_headers.get("this-is") {
             if value != "response-header" {
                 panic!(
@@ -157,7 +157,7 @@ impl HttpFilterInstance for HeadersFilterInstance {
         response_headers.set("this-is", "response-header");
         response_headers.set("multiple-values-res-to-be-single", "single");
 
-        EventHttpResponseHeadersStatus::Continue
+        ResponseHeadersStatus::Continue
     }
 }
 
@@ -206,7 +206,7 @@ impl HttpFilterInstance for DelayFilterInstance {
         &mut self,
         _request_headers: &RequestHeaders,
         _end_of_stream: bool,
-    ) -> EventHttpRequestHeadersStatus {
+    ) -> RequestHeadersStatus {
         if self.req_no == 1 {
             let envoy_filter_instance = self.envoy_filter_instance.clone();
             let req_no = self.req_no;
@@ -223,10 +223,10 @@ impl HttpFilterInstance for DelayFilterInstance {
                 "RequestHeaders returning StopAllIterationAndBuffer with id {}",
                 self.req_no
             );
-            EventHttpRequestHeadersStatus::StopAllIterationAndBuffer
+            RequestHeadersStatus::StopAllIterationAndBuffer
         } else {
             println!("RequestHeaders called with id {}", self.req_no);
-            EventHttpRequestHeadersStatus::Continue
+            RequestHeadersStatus::Continue
         }
     }
 
@@ -234,7 +234,7 @@ impl HttpFilterInstance for DelayFilterInstance {
         &mut self,
         _request_body: &RequestBodyBuffer,
         _end_of_stream: bool,
-    ) -> EventHttpRequestBodyStatus {
+    ) -> RequestBodyStatus {
         if self.req_no == 2 {
             let envoy_filter_instance = self.envoy_filter_instance.clone();
             let req_no = self.req_no;
@@ -251,10 +251,10 @@ impl HttpFilterInstance for DelayFilterInstance {
                 "RequestBody returning StopIterationAndBuffer with id {}",
                 self.req_no
             );
-            EventHttpRequestBodyStatus::StopIterationAndBuffer
+            RequestBodyStatus::StopIterationAndBuffer
         } else {
             println!("RequestBody called with id {}", self.req_no);
-            EventHttpRequestBodyStatus::Continue
+            RequestBodyStatus::Continue
         }
     }
 
@@ -262,7 +262,7 @@ impl HttpFilterInstance for DelayFilterInstance {
         &mut self,
         _response_headers: &ResponseHeaders,
         _end_of_stream: bool,
-    ) -> EventHttpResponseHeadersStatus {
+    ) -> ResponseHeadersStatus {
         if self.req_no == 3 {
             let envoy_filter_instance = self.envoy_filter_instance.clone();
             let req_no = self.req_no;
@@ -283,10 +283,10 @@ impl HttpFilterInstance for DelayFilterInstance {
                 self.req_no
             );
 
-            EventHttpResponseHeadersStatus::StopAllIterationAndBuffer
+            ResponseHeadersStatus::StopAllIterationAndBuffer
         } else {
             println!("ResponseHeaders called with id {}", self.req_no);
-            EventHttpResponseHeadersStatus::Continue
+            ResponseHeadersStatus::Continue
         }
     }
 
@@ -294,7 +294,7 @@ impl HttpFilterInstance for DelayFilterInstance {
         &mut self,
         _response_body: &ResponseBodyBuffer,
         _end_of_stream: bool,
-    ) -> EventHttpResponseBodyStatus {
+    ) -> ResponseBodyStatus {
         if self.req_no == 4 {
             let envoy_filter_instance = self.envoy_filter_instance.clone();
             let req_no = self.req_no;
@@ -312,10 +312,10 @@ impl HttpFilterInstance for DelayFilterInstance {
                 self.req_no
             );
 
-            EventHttpResponseBodyStatus::StopIterationAndBuffer
+            ResponseBodyStatus::StopIterationAndBuffer
         } else {
             println!("ResponseBody called with id {}", self.req_no);
-            EventHttpResponseBodyStatus::Continue
+            ResponseBodyStatus::Continue
         }
     }
 
