@@ -15,8 +15,8 @@ mod abi {
 /// ## Arguments
 ///
 /// * `$new_filter_fn` - The function that creates a new HttpFilter object: `fn(&str) -> Box<dyn HttpFilter>`.
-///  This function is called for each new filter chain configuration and should return a new HttpFilter object
-///  based on the configuration string.
+///     This function is called for each new filter chain configuration and should return a new HttpFilter object
+///     based on the configuration string.
 ///
 /// ## Example
 ///
@@ -348,7 +348,7 @@ impl RequestHeaders {
             return values;
         }
 
-        values = Vec::with_capacity(total as usize);
+        values = Vec::with_capacity(total);
         values.push(unsafe {
             std::str::from_utf8(std::slice::from_raw_parts(result_ptr, result_size)).unwrap()
         });
@@ -474,7 +474,7 @@ impl ResponseHeaders {
             return values;
         }
 
-        values = Vec::with_capacity(total as usize);
+        values = Vec::with_capacity(total);
         values.push(unsafe {
             std::str::from_utf8(std::slice::from_raw_parts(result_ptr, result_size)).unwrap()
         });
