@@ -224,11 +224,11 @@ pub trait HttpFilterInstance {
     /// This is called when request body data is received.
     /// The function should return the status of the operation.
     ///
-    /// * `request_body` is the reference to the newly arrived request body buffer.
+    /// * `_request_body_frame` is the reference to the newly arrived request body frame.
     /// * `end_of_stream` is a boolean that indicates if this is the last data frame.
     fn request_body(
         &mut self,
-        _request_body: &RequestBodyBuffer,
+        _request_body_frame: &RequestBodyBuffer,
         _end_of_stream: bool,
     ) -> RequestBodyStatus {
         RequestBodyStatus::Continue
@@ -250,11 +250,11 @@ pub trait HttpFilterInstance {
     /// This is called when response body data is received.
     /// The function should return the status of the operation.
     ///
-    /// * `response_body` is the reference to the newly arrived response body buffer.
+    /// * `_response_body_frame` is the reference to the newly arrived response body frame.
     /// * `end_of_stream` is a boolean that indicates if this is the last data frame.
     fn response_body(
         &mut self,
-        _response_body: &ResponseBodyBuffer,
+        _response_body_frame: &ResponseBodyBuffer,
         _end_of_stream: bool,
     ) -> ResponseBodyStatus {
         ResponseBodyStatus::Continue

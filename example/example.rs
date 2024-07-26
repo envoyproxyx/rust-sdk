@@ -59,7 +59,7 @@ impl HttpFilterInstance for HelloWorldFilterInstance {
 
     fn request_body(
         &mut self,
-        _request_body: &RequestBodyBuffer,
+        _request_body_frame: &RequestBodyBuffer,
         _end_of_stream: bool,
     ) -> RequestBodyStatus {
         println!("RequestBody called");
@@ -77,7 +77,7 @@ impl HttpFilterInstance for HelloWorldFilterInstance {
 
     fn response_body(
         &mut self,
-        _response_body: &ResponseBodyBuffer,
+        _response_body_frame: &ResponseBodyBuffer,
         _end_of_stream: bool,
     ) -> ResponseBodyStatus {
         println!("ResponseBody called");
@@ -229,7 +229,7 @@ impl HttpFilterInstance for DelayFilterInstance {
 
     fn request_body(
         &mut self,
-        _request_body: &RequestBodyBuffer,
+        _request_body_frame: &RequestBodyBuffer,
         _end_of_stream: bool,
     ) -> RequestBodyStatus {
         if self.req_no == 2 {
@@ -289,7 +289,7 @@ impl HttpFilterInstance for DelayFilterInstance {
 
     fn response_body(
         &mut self,
-        _response_body: &ResponseBodyBuffer,
+        _response_body_frame: &ResponseBodyBuffer,
         _end_of_stream: bool,
     ) -> ResponseBodyStatus {
         if self.req_no == 4 {
@@ -347,12 +347,12 @@ struct BodiesFilterInstance {
 impl HttpFilterInstance for BodiesFilterInstance {
     fn request_body(
         &mut self,
-        request_body: &RequestBodyBuffer,
+        request_body_frame: &RequestBodyBuffer,
         end_of_stream: bool,
     ) -> RequestBodyStatus {
         println!(
             "new request body frame: {}",
-            String::from_utf8(request_body.copy()).unwrap()
+            String::from_utf8(request_body_frame.copy()).unwrap()
         );
         if !end_of_stream {
             // Wait for the end of the stream to see the full body.
@@ -394,12 +394,12 @@ impl HttpFilterInstance for BodiesFilterInstance {
 
     fn response_body(
         &mut self,
-        response_body: &ResponseBodyBuffer,
+        response_body_frame: &ResponseBodyBuffer,
         end_of_stream: bool,
     ) -> ResponseBodyStatus {
         println!(
             "new response body frame: {}",
-            String::from_utf8(response_body.copy()).unwrap()
+            String::from_utf8(response_body_frame.copy()).unwrap()
         );
         if !end_of_stream {
             // Wait for the end of the stream to see the full body.
@@ -497,7 +497,7 @@ impl HttpFilterInstance for BodiesReplaceInstance {
 
     fn request_body(
         &mut self,
-        _request_body: &RequestBodyBuffer,
+        _request_body_frame: &RequestBodyBuffer,
         end_of_stream: bool,
     ) -> RequestBodyStatus {
         if !end_of_stream {
@@ -538,7 +538,7 @@ impl HttpFilterInstance for BodiesReplaceInstance {
 
     fn response_body(
         &mut self,
-        _response_body: &ResponseBodyBuffer,
+        _response_body_frame: &ResponseBodyBuffer,
         end_of_stream: bool,
     ) -> ResponseBodyStatus {
         if !end_of_stream {
